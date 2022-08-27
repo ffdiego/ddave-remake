@@ -17,6 +17,9 @@ int main(int argc, char* argv[])
   SDL_Window *window;
   SDL_Renderer *renderer;
   const uint8_t DISPLAY_SCALE = 3;
+  uint32_t timer_begin;
+  uint32_t timer_end;
+  uint32_t delay;
   struct game_state *game;
   struct game_assets *assets;
 
@@ -38,9 +41,17 @@ int main(int argc, char* argv[])
   SDL_RenderClear(renderer);
 
   while(!game->quit){
+    timer_begin = SDL_GetTicks();
+
     check_input(game);
     update_game(game);
     render(game, renderer, assets);
+
+    timer_end = SDL_GetTicks();
+
+    delay = 33 - (timer_end - timer_begin);
+    delay = delay > 33 ? 0 : delay;
+    SDL_Delay(10);
   }
 
   free(game);
@@ -59,6 +70,7 @@ void init_game(struct game_state *game) {
   game->current_level=0;
   game->view_x = 0;
   game->view_y = 0;
+  game->scroll_x = 0;
 
   for (j=0;j<10;j++){
     fname[0]='\0';
@@ -81,7 +93,82 @@ void init_game(struct game_state *game) {
     fclose(file_level);
   }
 }
-void init_assets(struct game_assets *game, SDL_Renderer *renderer){}
-void check_input(struct game_state *game){}
-void update_game(struct game_state *game){}
-void render(struct game_state *game, SDL_Renderer *renderer, struct game_assets *assets){}
+void init_assets(struct game_assets *assets, SDL_Renderer *renderer){
+  int i;
+  char fname[13];
+  char file_num[4];
+
+
+  for(i=0;i<158;i++){
+    fname[0]='\0';
+    strcat(fname,"tile");
+    sprintf(&file_num[0], "%u", i);
+    strcat(fname, file_num);
+    strcat(fname, ".bmp");
+
+    assets->graphics_tiles[i] = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP(fname));
+  }
+}
+void check_input(struct game_state *game){
+  SDL_Event event;
+  SDL_PollEvent(&event);
+
+  if(event.type == SDL_QUIT)
+    game->quit = 1;
+
+  if(event.type == SDL_KEYDOWN){
+    if(event.key.keysym.sym == SDLK_RIGHT)
+      game->scroll_x = 15;
+    if(event.key.keysym.sym == SDLK_LEFT)
+      game->scroll_x = -15;
+    if(event.key.keysym.sym == SDLK_UP)
+      game->current_level++;
+    if(event.key.keysym.sym == SDLK_DOWN)
+      game->current_level--;
+  }
+}
+void update_game(struct game_state *game){
+  if(game->current_level == 0xFF) {
+    game->current_level = 0;
+  }
+  if(game->current_level > 9) {
+    game->current_level = 9;
+  }
+  if(game->scroll_x > 0){
+    if(game->view_x == 80)
+      game->scroll_x =0;
+    else {
+      game->view_x++;
+      game->scroll_x--;
+    }
+  }
+  if(game->scroll_x < 0){
+    if(game->view_x == 0)
+      game->scroll_x =0;
+    else {
+      game->view_x--;
+      game->scroll_x++;
+    }
+  }
+}
+
+void render(struct game_state *game, SDL_Renderer *renderer, struct game_assets *assets){
+  uint8_t i,j;
+  SDL_Rect dest;
+  uint8_t tile_index;
+
+  for (j = 0; j < 10; j++)
+  {
+    dest.y = j*16;
+    dest.w = 16;
+    dest.h = 16;
+    for (i = 0; i < 20; i++)
+    {
+      dest.x = i * 16;
+      tile_index = game->level[game->current_level].tiles[j*100+game->view_x+i];
+      SDL_RenderCopy(renderer, assets->graphics_tiles[tile_index], NULL, &dest);
+    }
+    SDL_RenderPresent(renderer);
+  }
+  
+}

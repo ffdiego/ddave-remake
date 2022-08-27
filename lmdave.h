@@ -13,6 +13,8 @@ struct game_state{
   uint8_t current_level;
   uint8_t view_x;
   uint8_t view_y;
+  int8_t scroll_x;
+
   struct dave_level level[10];
 };
 
